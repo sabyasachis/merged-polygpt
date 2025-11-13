@@ -10,18 +10,34 @@ app.on('ready', async () => {
 
   // IPC handler for text updates from renderer
   ipcMain.handle('send-text-update', async (event, text) => {
-    // Send text to all 4 preload scripts
-    if (mainWindow.chatgptView && mainWindow.chatgptView.webContents) {
-      mainWindow.chatgptView.webContents.send('text-update', text);
-    }
-    if (mainWindow.geminiView && mainWindow.geminiView.webContents) {
-      mainWindow.geminiView.webContents.send('text-update', text);
-    }
-    if (mainWindow.perplexityView && mainWindow.perplexityView.webContents) {
-      mainWindow.perplexityView.webContents.send('text-update', text);
-    }
-    if (mainWindow.claudeView && mainWindow.claudeView.webContents) {
-      mainWindow.claudeView.webContents.send('text-update', text);
+    const supersizedView = mainWindow.getSupersizedView ? mainWindow.getSupersizedView() : null;
+
+    // If supersized, only send to that view
+    if (supersizedView) {
+      const viewMap = {
+        chatgpt: mainWindow.chatgptView,
+        gemini: mainWindow.geminiView,
+        perplexity: mainWindow.perplexityView,
+        claude: mainWindow.claudeView,
+      };
+      const targetView = viewMap[supersizedView];
+      if (targetView && targetView.webContents) {
+        targetView.webContents.send('text-update', text);
+      }
+    } else {
+      // Send text to all 4 preload scripts
+      if (mainWindow.chatgptView && mainWindow.chatgptView.webContents) {
+        mainWindow.chatgptView.webContents.send('text-update', text);
+      }
+      if (mainWindow.geminiView && mainWindow.geminiView.webContents) {
+        mainWindow.geminiView.webContents.send('text-update', text);
+      }
+      if (mainWindow.perplexityView && mainWindow.perplexityView.webContents) {
+        mainWindow.perplexityView.webContents.send('text-update', text);
+      }
+      if (mainWindow.claudeView && mainWindow.claudeView.webContents) {
+        mainWindow.claudeView.webContents.send('text-update', text);
+      }
     }
   });
 
@@ -51,17 +67,34 @@ app.on('ready', async () => {
 
   // Handle submit message request
   ipcMain.handle('submit-message', async (event) => {
-    if (mainWindow.chatgptView && mainWindow.chatgptView.webContents) {
-      mainWindow.chatgptView.webContents.send('submit-message');
-    }
-    if (mainWindow.geminiView && mainWindow.geminiView.webContents) {
-      mainWindow.geminiView.webContents.send('submit-message');
-    }
-    if (mainWindow.perplexityView && mainWindow.perplexityView.webContents) {
-      mainWindow.perplexityView.webContents.send('submit-message');
-    }
-    if (mainWindow.claudeView && mainWindow.claudeView.webContents) {
-      mainWindow.claudeView.webContents.send('submit-message');
+    const supersizedView = mainWindow.getSupersizedView ? mainWindow.getSupersizedView() : null;
+
+    // If supersized, only submit to that view
+    if (supersizedView) {
+      const viewMap = {
+        chatgpt: mainWindow.chatgptView,
+        gemini: mainWindow.geminiView,
+        perplexity: mainWindow.perplexityView,
+        claude: mainWindow.claudeView,
+      };
+      const targetView = viewMap[supersizedView];
+      if (targetView && targetView.webContents) {
+        targetView.webContents.send('submit-message');
+      }
+    } else {
+      // Submit to all 4 views
+      if (mainWindow.chatgptView && mainWindow.chatgptView.webContents) {
+        mainWindow.chatgptView.webContents.send('submit-message');
+      }
+      if (mainWindow.geminiView && mainWindow.geminiView.webContents) {
+        mainWindow.geminiView.webContents.send('submit-message');
+      }
+      if (mainWindow.perplexityView && mainWindow.perplexityView.webContents) {
+        mainWindow.perplexityView.webContents.send('submit-message');
+      }
+      if (mainWindow.claudeView && mainWindow.claudeView.webContents) {
+        mainWindow.claudeView.webContents.send('submit-message');
+      }
     }
     return true;
   });
@@ -123,6 +156,15 @@ app.on('ready', async () => {
     }
 
     return newZoom;
+  });
+
+  // Handle toggle supersize request
+  ipcMain.handle('toggle-supersize', async (event, viewId) => {
+    if (mainWindow.toggleSupersize) {
+      const supersizedView = mainWindow.toggleSupersize(viewId);
+      return supersizedView;
+    }
+    return null;
   });
 });
 
