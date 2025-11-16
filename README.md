@@ -28,9 +28,7 @@ macOS users may see a security warning on first launch. Right-click the app and 
 
 ## Demo
 
-<video src="https://storage.googleapis.com/polygpt-assets/demo.mp4" width="100%" controls></video>
-
-> **Note:** If the video doesn't play above, [click here to watch it](https://storage.googleapis.com/polygpt-assets/demo.mp4).
+![PolyGPT Demo](https://storage.googleapis.com/polygpt-assets/demo.gif)
 
 ## Building from Source
 
