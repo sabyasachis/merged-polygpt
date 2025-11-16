@@ -98,6 +98,7 @@ function createControlsContainer() {
   const container = document.createElement('div');
   container.id = 'polygpt-controls-container';
   Object.assign(container.style, {
+    all: 'initial',
     position: 'fixed',
     top: '10px',
     right: '10px',
@@ -105,6 +106,13 @@ function createControlsContainer() {
     gap: '8px',
     zIndex: '9999999',
     pointerEvents: 'auto',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    fontSize: '14px',
+    fontWeight: 'normal',
+    lineHeight: 'normal',
+    letterSpacing: 'normal',
+    boxSizing: 'border-box',
+    margin: '0',
   });
   return container;
 }
@@ -134,6 +142,8 @@ function styleDropdown(dropdown) {
   Object.assign(dropdown.style, {
     position: 'relative',
     cursor: 'pointer',
+    boxSizing: 'border-box',
+    margin: '0',
   });
 
   Object.assign(selected.style, {
@@ -142,6 +152,10 @@ function styleDropdown(dropdown) {
     background: 'rgba(0, 0, 0, 0.5)',
     color: 'white',
     fontSize: '14px',
+    fontFamily: 'inherit',
+    fontWeight: 'normal',
+    lineHeight: 'normal',
+    letterSpacing: 'normal',
     padding: '8px 12px',
     height: '36px',
     minWidth: '100px',
@@ -152,6 +166,8 @@ function styleDropdown(dropdown) {
     justifyContent: 'center',
     whiteSpace: 'nowrap',
     userSelect: 'none',
+    boxSizing: 'border-box',
+    margin: '0',
   });
 
   Object.assign(menu.style, {
@@ -165,6 +181,9 @@ function styleDropdown(dropdown) {
     backdropFilter: 'blur(4px)',
     zIndex: '10000000',
     overflow: 'hidden',
+    boxSizing: 'border-box',
+    margin: '0',
+    padding: '0',
   });
 }
 
@@ -185,9 +204,16 @@ function populateDropdownOptions(dropdown, viewInfo) {
       padding: '10px 12px',
       color: 'white',
       fontSize: '14px',
+      fontFamily: 'inherit',
+      fontWeight: 'normal',
+      lineHeight: 'normal',
+      letterSpacing: 'normal',
       cursor: 'pointer',
       transition: 'all 0.2s ease',
       background: provider.key === viewInfo.provider ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+      boxSizing: 'border-box',
+      margin: '0',
+      border: 'none',
     });
 
     option.addEventListener('mouseenter', () => {
@@ -253,6 +279,10 @@ function styleButton(button) {
     color: 'white',
     width: '36px',
     height: '36px',
+    minWidth: '36px',
+    minHeight: '36px',
+    maxWidth: '36px',
+    maxHeight: '36px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
@@ -260,7 +290,13 @@ function styleButton(button) {
     backdropFilter: 'blur(4px)',
     transition: 'all 0.2s ease',
     padding: '0',
+    margin: '0',
     fontSize: '16px',
+    fontFamily: 'inherit',
+    fontWeight: 'normal',
+    lineHeight: 'normal',
+    letterSpacing: 'normal',
+    boxSizing: 'border-box',
   });
 }
 
