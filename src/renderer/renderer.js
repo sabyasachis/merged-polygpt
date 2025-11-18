@@ -97,12 +97,3 @@ zoomOutBtn.addEventListener('click', () => {
 textInput.focus();
 
 updateCharCount();
-
-// Keyboard shortcut: "n" for new chat
-document.addEventListener('keydown', (event) => {
-  // Only trigger if textarea is not focused
-  if (event.key === 'n' && document.activeElement !== textInput) {
-    event.preventDefault();
-    newChatBtn.click();
-  }
-});
