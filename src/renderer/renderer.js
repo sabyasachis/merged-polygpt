@@ -3,9 +3,6 @@ const throttle = require('../utils/throttle');
 
 const textInput = document.getElementById('textInput');
 const charCount = document.getElementById('charCount');
-const errorBanner = document.getElementById('errorBanner');
-const errorMessage = document.getElementById('errorMessage');
-const retryBtn = document.getElementById('retryBtn');
 const refreshBtn = document.getElementById('refreshBtn');
 const newChatBtn = document.getElementById('newChatBtn');
 const zoomInBtn = document.getElementById('zoomInBtn');
@@ -47,24 +44,6 @@ function submitMessage() {
   currentText = '';
   updateCharCount();
 }
-
-ipcRenderer.on('selector-error', (event, data) => {
-  const { source, error } = data;
-  errorMessage.textContent = `[${source}] ${error}`;
-  errorBanner.style.display = 'flex';
-
-  setTimeout(() => {
-    errorBanner.style.display = 'none';
-  }, 5000);
-});
-
-retryBtn.addEventListener('click', () => {
-  ipcRenderer.invoke('rescan-selectors').catch((error) => {
-    console.error('Failed to rescan:', error);
-  });
-
-  errorBanner.style.display = 'none';
-});
 
 refreshBtn.addEventListener('click', () => {
   ipcRenderer.invoke('refresh-pages').catch((error) => {
