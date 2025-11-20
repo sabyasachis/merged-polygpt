@@ -1,6 +1,6 @@
 {
   "name": "polygpt",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Mirror text to ChatGPT and Gemini simultaneously",
   "author": {
     "name": "Nathan Cavaglione",
@@ -33,6 +33,8 @@
     "mac": {
       "icon": "assets/icons/icon.icns",
       "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
       "target": [
         {
           "target": "dmg",
