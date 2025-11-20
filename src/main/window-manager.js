@@ -1,4 +1,4 @@
-const { BaseWindow, WebContentsView, Menu } = require('electron');
+const { BaseWindow, WebContentsView, Menu, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -102,7 +102,9 @@ function createProviderView(providerKey, position) {
     if (params.selectionText) {
       template.push({
         label: 'Copy',
-        role: 'copy',
+        click: () => {
+          clipboard.writeText(params.selectionText);
+        },
       });
     }
 
@@ -163,7 +165,9 @@ async function createWindow() {
     if (params.selectionText) {
       template.push({
         label: 'Copy',
-        role: 'copy',
+        click: () => {
+          clipboard.writeText(params.selectionText);
+        },
       });
     }
 
