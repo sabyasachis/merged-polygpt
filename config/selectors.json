@@ -20,8 +20,10 @@
     "response": [
       "div[data-message-author-role='assistant']",
       "article[data-testid='conversation-turn']:has([data-message-author-role='assistant'])",
-      ".agent-turn:last-of-type",
-      "div[class*='markdown']"
+      ".agent-turn",
+      "div[class*='markdown']",
+      "div.response-text",
+      "div[data-message-model-slug]"
     ],
     "responseContainer": [
       "main",
@@ -53,10 +55,14 @@
       "[data-testid='new-chat-button']"
     ],
     "response": [
-      "model-response:last-of-type",
-      "message-content[data-role='model']:last-of-type",
-      "div[class*='model-response']:last-of-type",
-      "div[class*='response-container']:last-of-type"
+      "model-response",
+      "message-content[data-role='model']",
+      "div[class*='model-response']",
+      "div[class*='response-container']",
+      "div.model-response-text",
+      "div[data-test-id*='model-turn']",
+      ".response-container-content",
+      "div[class*='conversation'] > div[class*='model']"
     ],
     "responseContainer": [
       "main",
@@ -122,13 +128,14 @@
       "button[title*='New chat']"
     ],
     "response": [
-      "div.font-claude-response:last-of-type",
-      "div.standard-markdown:last-of-type",
-      "p.font-claude-response-body:last-of-type",
-      "div[data-message-author-role='assistant']:last-of-type",
+      "div.font-claude-response",
+      "div.progressive-markdown",
+      "div.standard-markdown",
+      "p.font-claude-response-body",
+      "div[data-message-author-role='assistant']",
       "div[data-is-streaming='true'][data-message-author-role='assistant']",
-      "div[class*='assistant']:last-of-type div[class*='prose']",
-      "[data-testid*='message'][data-message-author-role='assistant']:last-of-type",
+      "div[class*='assistant'] div[class*='prose']",
+      "[data-testid*='message'][data-message-author-role='assistant']",
       "div[data-is-streaming]",
       "[class*='prose']:not(:has(input))",
       "div.whitespace-pre-wrap"

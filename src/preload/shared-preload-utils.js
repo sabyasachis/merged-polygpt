@@ -574,6 +574,34 @@ function extractLatestResponse(provider, config) {
     }
   }
 
+  // ROBUST FALLBACK: Auto-discover response elements if configured selectors fail
+  if (allResponses.length === 0) {
+    const container = findElement(config[provider]?.responseContainer) || document.body;
+
+    // Try to find elements with substantial text content (likely responses)
+    const candidates = Array.from(container.querySelectorAll('div, p, article, section')).filter(el => {
+      const text = el.innerText || el.textContent || '';
+      // Must have substantial text (>50 chars) and not be an input container
+      return text.length > 50 &&
+             !el.querySelector('input, textarea') &&
+             !el.closest('[contenteditable="true"]');
+    });
+
+    if (candidates.length > 0) {
+      // Sort by text length (descending) - longer texts are more likely to be responses
+      candidates.sort((a, b) => {
+        const aLen = (a.innerText || '').length;
+        const bLen = (b.innerText || '').length;
+        return bLen - aLen;
+      });
+
+      // Take top candidates (up to 10) and add to responses
+      allResponses.push(...candidates.slice(0, 10));
+      workingSelector = '[auto-discovered]';
+      console.log(`[${provider}] Auto-discovered ${allResponses.length} response elements`);
+    }
+  }
+
   if (allResponses.length === 0) {
     // Log every 10 seconds to avoid spam
     if (!extractLatestResponse.lastLogTime || Date.now() - extractLatestResponse.lastLogTime > 10000) {

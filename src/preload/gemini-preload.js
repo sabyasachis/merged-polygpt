@@ -113,6 +113,42 @@ setupSupersizeListener();
 
 setupLoadingOverlay();
 
+// Debug function to inspect actual DOM structure for Gemini
+window.polygptDebugGeminiDOM = function() {
+  console.log('=== Gemini DOM Debug Info ===');
+  const container = findElement(config.gemini?.responseContainer);
+  console.log('Response container:', container);
+
+  if (container) {
+    console.log('\n--- Custom elements (model-response, message-content) ---');
+    const customEls = container.querySelectorAll('model-response, message-content');
+    console.log(`Found ${customEls.length} custom elements`);
+    Array.from(customEls).forEach((el, idx) => {
+      console.log(`Element ${idx + 1}:`, {
+        tag: el.tagName,
+        attributes: Array.from(el.attributes).map(a => `${a.name}="${a.value}"`),
+        textPreview: (el.innerText || '').substring(0, 150)
+      });
+    });
+
+    console.log('\n--- Divs with "model" or "response" in class ---');
+    const responseEls = container.querySelectorAll('[class*="model"], [class*="response"]');
+    console.log(`Found ${responseEls.length} elements`);
+    Array.from(responseEls).slice(0, 10).forEach((el, idx) => {
+      const text = el.innerText || '';
+      if (text.length > 50) {
+        console.log(`Element ${idx + 1}:`, {
+          tag: el.tagName,
+          classes: el.className,
+          textLength: text.length,
+          textPreview: text.substring(0, 150)
+        });
+      }
+    });
+  }
+  console.log('=== End Gemini Debug Info ===');
+};
+
 // Setup response monitoring
 const responseMonitor = setupResponseMonitoring(provider, config, ipcRenderer, getViewInfo);
 waitForDOM(() => {
