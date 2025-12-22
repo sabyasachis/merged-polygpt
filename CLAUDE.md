@@ -160,32 +160,112 @@ npm run build
   --notes "[Release notes]"
 ```
 
-**Latest Release:** [v0.2.5](https://github.com/sabyasachis/merged-polygpt/releases/tag/v0.2.5)
+**Latest Release:** [v0.2.6](https://github.com/sabyasachis/merged-polygpt/releases/tag/v0.2.6)
 - Pre-built macOS DMG available (172MB universal binary)
 - Installation: Drag to Applications, then run `xattr -cr /Applications/PolyGPT.app`
 
 ### Recent Development Activity
 
-**Recent Commits (This Session):**
-1. **Add documentation file for Claude AI context** - Created claude.md for session continuity
-2. **Add merge mode feature** (1,483 insertions across 12 files)
+**Recent Commits:**
+1. **Fix response detection with robust selector system** (v0.2.6)
+   - Removed broken `:last-of-type` pseudo-selectors
+   - Implemented auto-discovery fallback for when selectors fail
+   - Added `progressive-markdown` and `standard-markdown` selectors for Claude
+   - Enhanced Gemini with multiple fallback selectors
+   - Fixed auto-merge not triggering issue
+2. **Add documentation file for Claude AI context** - Created claude.md for session continuity
+3. **Add merge mode feature** (1,483 insertions across 12 files)
    - AI-synthesized responses from multiple providers
    - Automatic citations [1] [2] [3]
    - Configurable auto-merge timeout
    - Visual merger window indicators
-   - Added USAGE.md with detailed merge mode instructions
-3. **Add macOS installation guide** - INSTALL.md with security bypass methods
-4. **Update README for merged-polygpt repo**
-   - Added demo video (docs/demo.mp4)
-   - Highlighted merge mode as main feature
-   - Restructured to recommend running from source
-   - Removed INSTALL.md and CONTRIBUTING.md
+4. **Rebrand README to merged-polygpt** - Simplified structure, added demo GIF
 
 **Recent Focus:**
-- Merge mode implementation and UX refinement
-- macOS code signing (disabled for free distribution)
+- Response detection reliability and auto-merge fixes
+- Adaptive selector system for future-proofing
 - Command-line release workflow with GitHub CLI
-- Documentation and installation simplification
+- Documentation and debugging tools
+
+## Troubleshooting & Debugging
+
+### Common Issues
+
+#### Auto-Merge Not Triggering
+
+**Symptoms:** Providers complete responses but merge doesn't trigger (stuck at 2/3 or doesn't reach 3/3)
+
+**Root Cause:** Response detection failing due to outdated CSS selectors
+
+**Debug Steps:**
+1. Open DevTools in the app (`npm run dev`)
+2. Check console for `[provider] No response elements found` errors
+3. Run debug functions in console:
+   - `window.polygptDebugClaudeDOM()` - Inspect Claude's DOM structure
+   - `window.polygptDebugGeminiDOM()` - Inspect Gemini's DOM structure
+   - `window.polygptDebugStopButton()` - Check stop button detection
+
+**Fix:** Update `config/selectors.json` with new selectors based on debug output
+
+**Example Fix (v0.2.6):**
+- **Problem:** `:last-of-type` pseudo-selector doesn't work with `querySelectorAll`
+  - `div.font-claude-response:last-of-type` fails because it selects last `<div>` tag, not last element with that class
+- **Solution:** Remove `:last-of-type` and let code pick last element from array
+  - Use `div.font-claude-response` instead
+  - Code already does `allResponses[allResponses.length - 1]`
+
+### Auto-Discovery Fallback
+
+When configured selectors fail, the system automatically:
+1. Searches for elements with substantial text (>50 chars)
+2. Excludes input fields and user messages
+3. Sorts by text length (longer = likely response)
+4. Takes top candidates
+
+**Console Output:**
+```
+[claude] Auto-discovered 1 response elements
+[gemini] Auto-discovered 10 response elements
+[chatgpt] Auto-discovered 2 response elements
+```
+
+### Debug Functions Available
+
+**In DevTools Console:**
+```javascript
+// Claude DOM inspection
+window.polygptDebugClaudeDOM()
+
+// Gemini DOM inspection
+window.polygptDebugGeminiDOM()
+
+// Stop button detection
+window.polygptDebugStopButton()
+
+// Get current view info
+window.polygptGetViewInfo()
+```
+
+### Monitoring Response Detection
+
+**Watch for these log patterns:**
+
+✅ **Working:**
+```
+[Claude@topRight] [claude] Auto-discovered 1 response elements
+[Claude@topRight] Response update: 150 chars
+[Claude@topRight] ✓ Stop button disappeared, response complete
+[Merge] Response complete from topRight (claude) - 3/3
+[Merge] Auto-merge enabled, performing merge
+```
+
+❌ **Broken:**
+```
+[Claude@topRight] [claude] No response elements found. Tried selectors: ...
+[Merge] Response complete from topLeft (gemini) - 1/3
+[Merge] Response complete from bottomLeft (chatgpt) - 2/3
+# Stuck at 2/3, never reaches 3/3
+```
 
 ## Adding New Providers
 
