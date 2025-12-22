@@ -6,6 +6,8 @@ PolyGPT is a cross-platform Electron desktop application that enables users to i
 
 **Key Value Proposition:** Type once, send to all AI providers simultaneously, eliminating repetitive typing across different platforms.
 
+**NEW: Merge Mode** - Get AI-synthesized answers from multiple LLMs with citations, reducing cognitive load when comparing responses. Inspired by Andrej Karpathy's "LLM council" concept.
+
 ## Technology Stack
 
 - **Electron 31.0.0** - Cross-platform desktop framework
@@ -23,23 +25,27 @@ PolyGPT is a cross-platform Electron desktop application that enables users to i
 ```
 src/
 ├── main/
-│   ├── index.js           # Main process entry point, IPC handlers
+│   ├── index.js           # Main process entry point, IPC handlers, merge mode logic
 │   └── window-manager.js  # Window layout, provider management, view orchestration
 ├── preload/
-│   ├── shared-preload-utils.js    # Shared utilities for all providers
+│   ├── shared-preload-utils.js    # Shared utilities, response detection, merge mode UI
 │   ├── chatgpt-preload.js         # ChatGPT-specific DOM manipulation
 │   ├── claude-preload.js          # Claude-specific DOM manipulation
 │   ├── gemini-preload.js          # Gemini-specific DOM manipulation
 │   └── perplexity-preload.js      # Perplexity-specific DOM manipulation
 ├── renderer/
-│   ├── index.html         # Control bar UI
-│   ├── renderer.js        # Control bar logic
-│   └── styles.css         # Control bar styling
+│   ├── index.html         # Control bar UI with merge button
+│   ├── renderer.js        # Control bar logic, merge mode controls
+│   └── styles.css         # Control bar styling, merge mode UI
 └── utils/
     └── throttle.js        # Text update throttling
 config/
-├── selectors.json         # CSS selectors for each provider's DOM elements
+├── selectors.json         # CSS selectors for providers and response detection
 └── window-providers.json  # User's provider configuration (persisted)
+docs/
+└── demo.mp4               # Demo video for README
+USAGE.md                   # Detailed usage instructions for merge mode
+CLAUDE.md                  # AI context documentation for session continuity
 ```
 
 ### Key Components
@@ -72,6 +78,15 @@ config/
 
 ## Features
 
+### Merge Mode (NEW)
+- **AI-Synthesized Responses** - Ask once, get one coherent answer combining insights from multiple LLMs
+- **Automatic Citations** - Each point is cited [1] [2] [3] to show which model contributed
+- **Reduced Cognitive Load** - No more mentally synthesizing three different answers
+- **Follow-up Context** - Continue merged conversations with maintained context
+- **Configurable Timeout** - Auto-merge after responses arrive (adjustable settings)
+- **Visual Indicators** - Merger window shows which providers contributed to the answer
+
+### Core Features
 - **4-way Split View** - 2x2 grid with all 4 providers visible
 - **Unified Input** - Single textarea syncs to all providers simultaneously
 - **Provider Switching** - Dropdown to swap any provider on-the-fly
@@ -85,6 +100,15 @@ config/
 
 ## Technical Implementation Notes
 
+### Merge Mode Implementation
+- **Response Detection:** CSS selectors in `config/selectors.json` identify response containers for each provider
+- **Content Extraction:** MutationObserver monitors DOM for new responses in each provider window
+- **Response Collection:** Waits for 3 providers to complete responses (configurable timeout)
+- **AI Synthesis:** Uses one provider (typically Claude) to merge responses with citations
+- **Citation Mapping:** [1] [2] [3] links back to source providers
+- **Context Preservation:** Follow-up questions include previous merged conversation history
+- **Visual Indicators:** Merger window displays which providers contributed to synthesis
+
 ### Text Injection Strategies
 - **Textarea/Input:** Direct `.value` assignment
 - **ContentEditable:** DOM manipulation with text nodes
@@ -93,7 +117,7 @@ config/
 
 ### Provider-Specific Details
 - **ChatGPT:** Handles both textarea and contentEditable inputs
-- **Claude:** Uses ProseMirror editor detection
+- **Claude:** Uses ProseMirror editor detection, also serves as merge synthesizer
 - **Gemini:** Nested contenteditable divs with custom elements
 - **Perplexity:** Lexical editor with format-preserving text injection
 
@@ -101,21 +125,67 @@ config/
 - Context isolation enabled
 - NodeIntegration disabled for provider views
 - Persistent partition storage for login sessions
-- Hardened runtime on macOS
+- Hardened runtime on macOS (disabled for unsigned distribution)
 
 ## Development
 
 **Current Version:** 0.2.5
 
-**Commands:**
-- `npm start` - Run in normal mode
+**Repository:** https://github.com/sabyasachis/merged-polygpt
+
+### Development Commands
+
+**Running from Source (Recommended):**
+```bash
+export PATH="/tmp/node-v20.11.0-darwin-arm64/bin:$PATH"
+npm install
+npm start
+```
+
+**Other Commands:**
 - `npm run dev` - Run with DevTools
-- `npm run build` - Build for all platforms
+- `npm run build` - Build DMG for macOS (output in `dist/`)
+
+### Release Process
+
+**Build and Create Release:**
+```bash
+# Build the DMG
+export PATH="/tmp/node-v20.11.0-darwin-arm64/bin:$PATH"
+npm run build
+
+# Create GitHub release
+/opt/homebrew/bin/gh release create v0.2.X dist/PolyGPT-0.2.X-universal.dmg \
+  --title "v0.2.X - [Feature Name]" \
+  --notes "[Release notes]"
+```
+
+**Latest Release:** [v0.2.5](https://github.com/sabyasachis/merged-polygpt/releases/tag/v0.2.5)
+- Pre-built macOS DMG available (172MB universal binary)
+- Installation: Drag to Applications, then run `xattr -cr /Applications/PolyGPT.app`
+
+### Recent Development Activity
+
+**Recent Commits (This Session):**
+1. **Add documentation file for Claude AI context** - Created claude.md for session continuity
+2. **Add merge mode feature** (1,483 insertions across 12 files)
+   - AI-synthesized responses from multiple providers
+   - Automatic citations [1] [2] [3]
+   - Configurable auto-merge timeout
+   - Visual merger window indicators
+   - Added USAGE.md with detailed merge mode instructions
+3. **Add macOS installation guide** - INSTALL.md with security bypass methods
+4. **Update README for merged-polygpt repo**
+   - Added demo video (docs/demo.mp4)
+   - Highlighted merge mode as main feature
+   - Restructured to recommend running from source
+   - Removed INSTALL.md and CONTRIBUTING.md
 
 **Recent Focus:**
-- macOS notarization and code signing
-- Context menu improvements
-- Multi-line copy functionality
+- Merge mode implementation and UX refinement
+- macOS code signing (disabled for free distribution)
+- Command-line release workflow with GitHub CLI
+- Documentation and installation simplification
 
 ## Adding New Providers
 
