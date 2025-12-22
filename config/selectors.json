@@ -16,6 +16,22 @@
       "button[aria-label*='New chat']",
       "a[aria-label*='New chat']",
       "[data-testid='new-chat-button']"
+    ],
+    "response": [
+      "div[data-message-author-role='assistant']",
+      "article[data-testid='conversation-turn']:has([data-message-author-role='assistant'])",
+      ".agent-turn:last-of-type",
+      "div[class*='markdown']"
+    ],
+    "responseContainer": [
+      "main",
+      "div[role='presentation']",
+      "div[class*='conversation']"
+    ],
+    "stopButton": [
+      "button[data-testid='stop-button']",
+      "button[aria-label*='Stop']",
+      "button[aria-label*='stop generating']"
     ]
   },
   "gemini": {
@@ -35,6 +51,22 @@
       "a[aria-label*='New chat']",
       "button[title*='New chat']",
       "[data-testid='new-chat-button']"
+    ],
+    "response": [
+      "model-response:last-of-type",
+      "message-content[data-role='model']:last-of-type",
+      "div[class*='model-response']:last-of-type",
+      "div[class*='response-container']:last-of-type"
+    ],
+    "responseContainer": [
+      "main",
+      "chat-window",
+      "div[class*='conversation']"
+    ],
+    "stopButton": [
+      "button[aria-label*='Stop']",
+      "button[aria-label*='stop generating']",
+      "button[class*='stop-button']"
     ]
   },
   "perplexity": {
@@ -54,6 +86,22 @@
       "a[aria-label*='New']",
       "button[title*='New thread']",
       "[data-testid='new-thread-button']"
+    ],
+    "response": [
+      "div[class*='answer']",
+      "div[class*='response']",
+      "div[data-testid='perplexity-answer']",
+      "div[class*='markdown']"
+    ],
+    "responseContainer": [
+      "main",
+      "div[class*='thread']",
+      "div[class*='conversation']"
+    ],
+    "stopButton": [
+      "button[aria-label*='Stop']",
+      "button[title*='Stop']",
+      "button[class*='stop']"
     ]
   },
   "claude": {
@@ -72,6 +120,29 @@
       "button[aria-label*='New']",
       "a[aria-label*='New']",
       "button[title*='New chat']"
+    ],
+    "response": [
+      "div.font-claude-response:last-of-type",
+      "div.standard-markdown:last-of-type",
+      "p.font-claude-response-body:last-of-type",
+      "div[data-message-author-role='assistant']:last-of-type",
+      "div[data-is-streaming='true'][data-message-author-role='assistant']",
+      "div[class*='assistant']:last-of-type div[class*='prose']",
+      "[data-testid*='message'][data-message-author-role='assistant']:last-of-type",
+      "div[data-is-streaming]",
+      "[class*='prose']:not(:has(input))",
+      "div.whitespace-pre-wrap"
+    ],
+    "responseContainer": [
+      "main",
+      "div[class*='conversation']",
+      "div[role='main']",
+      "body"
+    ],
+    "stopButton": [
+      "button[aria-label='Stop generating']",
+      "button[aria-label*='Stop']",
+      "button[class*='stop']"
     ]
   }
 }

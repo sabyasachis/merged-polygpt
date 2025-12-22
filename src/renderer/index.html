@@ -17,13 +17,39 @@
       ></textarea>
       <div class="input-info">
         <span><span id="charCount">0</span> characters</span>
+        <span id="responseStatus" class="response-status">0/4 responses received</span>
         <span><kbd>Enter</kbd> to submit | <kbd>Shift+Enter</kbd> for new line</span>
         <div class="button-group">
-          <button id="newChatBtn" class="action-btn new-chat-btn" title="Start new chat in both">✨ New Chat</button>
-          <button id="refreshBtn" class="action-btn refresh-btn" title="Refresh both pages">🔄 Refresh</button>
+          <button id="newChatBtn" class="action-btn new-chat-btn" title="Start new chat in all windows">✨ New Chat</button>
+          <button id="refreshBtn" class="action-btn refresh-btn" title="Refresh all pages">🔄 Refresh</button>
           <button id="zoomOutBtn" class="action-btn zoom-btn zoom-out-btn" title="Zoom out">−</button>
           <button id="zoomInBtn" class="action-btn zoom-btn zoom-in-btn" title="Zoom in">+</button>
+          <button id="themeToggleBtn" class="action-btn theme-toggle-btn" title="Toggle dark/light mode">🌙 Dark</button>
         </div>
+      </div>
+      <div class="merge-controls">
+        <label class="merge-toggle-label" title="Enable merge mode: 3 windows answer, 1 window merges the responses">
+          <input type="checkbox" id="mergeModeToggle" />
+          <span>🔀 Merge Mode</span>
+        </label>
+        <label class="merge-toggle-label auto-merge-label" title="Auto-merge when all responses complete, or wait for manual trigger">
+          <input type="checkbox" id="autoMergeToggle" checked />
+          <span>⚡ Auto-Merge</span>
+        </label>
+        <select id="mergerWindowSelect" class="merger-select" title="Select which window will merge the responses from the other 3">
+          <option value="topLeft">Merger: Top-Left</option>
+          <option value="topRight">Merger: Top-Right</option>
+          <option value="bottomLeft">Merger: Bottom-Left</option>
+          <option value="bottomRight" selected>Merger: Bottom-Right</option>
+        </select>
+        <select id="timeoutSelect" class="timeout-select" title="Time to wait for responses before auto-merging">
+          <option value="60">Timeout: 1 min</option>
+          <option value="300" selected>Timeout: 5 min</option>
+          <option value="600">Timeout: 10 min</option>
+          <option value="3600">Timeout: 1 hour</option>
+          <option value="-1">Timeout: ∞ (wait forever)</option>
+        </select>
+        <button id="mergeNowBtn" class="action-btn merge-now-btn" title="Merge responses now (even if not all complete)">⚡ Merge Now</button>
       </div>
     </div>
   </div>

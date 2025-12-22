@@ -10,6 +10,7 @@ const {
   setupSupersizeListener,
   setupLoadingOverlay,
   waitForDOM,
+  setupResponseMonitoring,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -98,16 +99,25 @@ setupInputScanner(
   (selector) => findGeminiInput(findElement(selector))
 );
 
+const getMergerWindow = async () => {
+  const settings = await ipcRenderer.invoke('get-merge-settings');
+  return settings?.mergerWindow || 'bottomRight';
+};
+
 const getViewInfo = setupViewInfoListener((viewInfo) => {
   window.polygptGetViewInfo = () => viewInfo;
   createUIControls(viewInfo);
-});
+}, getMergerWindow);
 
 setupSupersizeListener();
 
 setupLoadingOverlay();
 
+// Setup response monitoring
+const responseMonitor = setupResponseMonitoring(provider, config, ipcRenderer, getViewInfo);
 waitForDOM(() => {
   const viewInfo = getViewInfo();
   if (viewInfo) createUIControls(viewInfo);
+  // Start monitoring after a short delay to ensure page is loaded
+  setTimeout(() => responseMonitor.startMonitoring(), 2000);
 });

@@ -10,6 +10,7 @@ const {
   setupSupersizeListener,
   setupLoadingOverlay,
   waitForDOM,
+  setupResponseMonitoring,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -84,16 +85,103 @@ setupInputScanner(
   null
 );
 
+const getMergerWindow = async () => {
+  const settings = await ipcRenderer.invoke('get-merge-settings');
+  return settings?.mergerWindow || 'bottomRight';
+};
+
 const getViewInfo = setupViewInfoListener((viewInfo) => {
   window.polygptGetViewInfo = () => viewInfo;
   createUIControls(viewInfo);
-});
+}, getMergerWindow);
 
 setupSupersizeListener();
 
 setupLoadingOverlay();
 
+// Debug function to inspect actual DOM structure
+window.polygptDebugClaudeDOM = function() {
+  console.log('=== Claude DOM Debug Info ===');
+  const container = findElement(config.claude?.responseContainer);
+  console.log('Response container:', container);
+
+  if (container) {
+    // Find all potential response elements
+    console.log('\n--- All divs with message-author attributes ---');
+    const messageElements = container.querySelectorAll('[data-message-author-role]');
+    console.log(`Found ${messageElements.length} elements with data-message-author-role`);
+    messageElements.forEach((el, idx) => {
+      console.log(`Element ${idx + 1}:`, {
+        tag: el.tagName,
+        role: el.getAttribute('data-message-author-role'),
+        classes: el.className,
+        attributes: Array.from(el.attributes).map(a => `${a.name}="${a.value}"`),
+        textPreview: (el.innerText || '').substring(0, 100)
+      });
+    });
+
+    console.log('\n--- All elements with "assistant" in class ---');
+    const assistantElements = container.querySelectorAll('[class*="assistant"]');
+    console.log(`Found ${assistantElements.length} elements with "assistant" in class`);
+    assistantElements.forEach((el, idx) => {
+      console.log(`Element ${idx + 1}:`, {
+        tag: el.tagName,
+        classes: el.className,
+        attributes: Array.from(el.attributes).map(a => `${a.name}="${a.value}"`),
+        textPreview: (el.innerText || '').substring(0, 100)
+      });
+    });
+
+    console.log('\n--- All elements with prose/markdown classes ---');
+    const proseElements = container.querySelectorAll('[class*="prose"], [class*="markdown"]');
+    console.log(`Found ${proseElements.length} elements with prose/markdown classes`);
+    proseElements.forEach((el, idx) => {
+      const info = {
+        tag: el.tagName,
+        classes: el.className,
+        parent: el.parentElement?.className,
+        textLength: (el.innerText || '').length,
+        textPreview: (el.innerText || '').substring(0, 100)
+      };
+      console.log(`Prose Element ${idx + 1}:`, JSON.stringify(info, null, 2));
+    });
+
+    // NEW: Try to find ANY element that contains substantial text
+    console.log('\n--- All elements with substantial text (>100 chars) ---');
+    const allElements = container.querySelectorAll('*');
+    const textElements = Array.from(allElements).filter(el => {
+      const text = el.innerText || el.textContent || '';
+      return text.length > 100 && !el.querySelector('*') && text.trim().length > 50;
+    });
+    console.log(`Found ${textElements.length} elements with substantial text`);
+    textElements.slice(0, 5).forEach((el, idx) => {
+      const info = {
+        tag: el.tagName,
+        classes: el.className,
+        id: el.id,
+        attributes: Array.from(el.attributes).map(a => `${a.name}="${a.value}"`),
+        textLength: (el.innerText || '').length,
+        textPreview: (el.innerText || '').substring(0, 150)
+      };
+      console.log(`Text Element ${idx + 1}:`, JSON.stringify(info, null, 2));
+    });
+  }
+  console.log('=== End Debug Info ===');
+};
+
+// Auto-run debug after a delay to capture initial state
+setTimeout(() => {
+  console.log('[AUTO-DEBUG] Running automatic DOM inspection in 5 seconds...');
+  setTimeout(() => {
+    window.polygptDebugClaudeDOM();
+  }, 5000);
+}, 1000);
+
+// Setup response monitoring
+const responseMonitor = setupResponseMonitoring(provider, config, ipcRenderer, getViewInfo);
 waitForDOM(() => {
   const viewInfo = getViewInfo();
   if (viewInfo) createUIControls(viewInfo);
+  // Start monitoring after a short delay to ensure page is loaded
+  setTimeout(() => responseMonitor.startMonitoring(), 2000);
 });

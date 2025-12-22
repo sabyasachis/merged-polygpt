@@ -13,7 +13,7 @@ function loadConfig() {
   }
 }
 
-function findElement(selectors) {
+function findElement(selectors, debug = false) {
   if (!Array.isArray(selectors)) {
     selectors = [selectors];
   }
@@ -22,11 +22,18 @@ function findElement(selectors) {
     try {
       const element = document.querySelector(selector);
       if (element) {
+        if (debug) {
+          console.log(`[DEBUG] Found element with selector: ${selector}`);
+        }
         return element;
       }
     } catch (error) {
       continue;
     }
+  }
+
+  if (debug) {
+    console.log(`[DEBUG] No element found. Tried selectors:`, selectors);
   }
   return null;
 }
@@ -357,17 +364,93 @@ function createUIControls(viewInfo) {
   document.body.appendChild(container);
 }
 
-function setupViewInfoListener(createUIControlsFn) {
+function setupViewInfoListener(createUIControlsFn, getMergerWindow) {
   let viewInfo = null;
 
   ipcRenderer.on('view-info', (event, info) => {
     viewInfo = info;
     if (document.body) {
       createUIControlsFn(info);
+
+      // Get merger window and show indicator if needed
+      if (getMergerWindow) {
+        getMergerWindow().then(mergerWindow => {
+          updateMergerIndicator(viewInfo, mergerWindow);
+        });
+      }
     }
   });
 
+  // Listen for merger window updates
+  ipcRenderer.on('merger-window-changed', (event, mergerPosition) => {
+    updateMergerIndicator(viewInfo, mergerPosition);
+  });
+
   return () => viewInfo;
+}
+
+function updateMergerIndicator(viewInfo, mergerPosition) {
+  if (!viewInfo) return;
+
+  // Remove existing indicator
+  const existingIndicator = document.getElementById('polygpt-merger-indicator');
+  if (existingIndicator) {
+    existingIndicator.remove();
+  }
+
+  // Add indicator if this is the merger window
+  if (viewInfo.position === mergerPosition) {
+    const indicator = document.createElement('div');
+    indicator.id = 'polygpt-merger-indicator';
+    Object.assign(indicator.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      right: '0',
+      bottom: '0',
+      border: '4px solid #ff6b35',
+      borderRadius: '8px',
+      pointerEvents: 'none',
+      zIndex: '9999998',
+      boxShadow: 'inset 0 0 20px rgba(255, 107, 53, 0.3)',
+      animation: 'polygpt-pulse 2s ease-in-out infinite'
+    });
+
+    // Add pulse animation
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes polygpt-pulse {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+      }
+    `;
+    if (!document.querySelector('#polygpt-merger-style')) {
+      style.id = 'polygpt-merger-style';
+      document.head.appendChild(style);
+    }
+
+    document.body.appendChild(indicator);
+
+    // Add label
+    const label = document.createElement('div');
+    label.textContent = '🔀 MERGER WINDOW';
+    Object.assign(label.style, {
+      position: 'fixed',
+      top: '50px',
+      right: '50px',
+      background: 'rgba(255, 107, 53, 0.9)',
+      color: 'white',
+      padding: '8px 16px',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontWeight: 'bold',
+      zIndex: '9999999',
+      pointerEvents: 'none',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+    });
+    document.body.appendChild(label);
+  }
 }
 
 function setupSupersizeListener() {
@@ -467,6 +550,330 @@ function waitForDOM(callback) {
   }
 }
 
+function extractLatestResponse(provider, config) {
+  const responseSelectors = config[provider]?.response;
+  if (!responseSelectors) {
+    console.warn(`[${provider}] No response selectors configured`);
+    return null;
+  }
+
+  // Find all response elements
+  const allResponses = [];
+  let workingSelector = null;
+  for (const selector of responseSelectors) {
+    try {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        allResponses.push(...Array.from(elements));
+        workingSelector = selector;
+        break; // Use first working selector
+      }
+    } catch (error) {
+      console.warn(`[${provider}] Selector error: ${selector}`, error);
+      continue;
+    }
+  }
+
+  if (allResponses.length === 0) {
+    // Log every 10 seconds to avoid spam
+    if (!extractLatestResponse.lastLogTime || Date.now() - extractLatestResponse.lastLogTime > 10000) {
+      console.warn(`[${provider}] No response elements found. Tried selectors:`, responseSelectors);
+      extractLatestResponse.lastLogTime = Date.now();
+    }
+    return null;
+  }
+
+  // Get the last (most recent) response
+  const lastResponse = allResponses[allResponses.length - 1];
+
+  let text = lastResponse.innerText || lastResponse.textContent || '';
+
+  // Filter out common thinking/loading indicators
+  const thinkingIndicators = [
+    /^Thinking\s*$/i,
+    /^Show thinking\s*$/i,
+    /^Answer now\s*$/i,
+    /^Examining.*\.\.\.$/i,
+    /^Exploring.*\.\.\.$/i,
+    /^Analyzing.*\.\.\.$/i,
+    /^Processing.*\.\.\.$/i,
+    /^Considering.*\.\.\.$/i,
+    /^Revising.*\.\.\.$/i,
+    /^Incorporating.*\.\.\.$/i,
+    /^Prioritizing.*\.\.\.$/i,
+    /^Acknowledging.*\.\.\.$/i,
+    /^Requesting.*\.\.\.$/i,
+    /^Defining.*\.\.\.$/i,
+    /^You stopped this response\.\.\.$/i
+  ];
+
+  // Split by newlines and filter out lines that match thinking indicators
+  const lines = text.split('\n');
+  const filteredLines = lines.filter(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    return !thinkingIndicators.some(pattern => pattern.test(trimmed));
+  });
+
+  text = filteredLines.join('\n').trim();
+
+  return {
+    text: text,
+    html: lastResponse.innerHTML || '',
+    timestamp: Date.now(),
+    selector: workingSelector
+  };
+}
+
+function setupResponseMonitoring(provider, config, ipcRenderer, getViewInfo) {
+  let lastResponseText = '';
+  let responseObserver = null;
+  let stopButtonObserver = null;
+  let isMonitoring = false;
+  let hasCompletedThisCycle = false;
+  let isStreaming = false;
+  const MAX_WAIT_TIME = 30000; // Force completion after 30 seconds even if still updating
+  let maxWaitTimeout = null;
+  let retryCompletionInterval = null; // For retrying after max wait timeout
+
+  // Expose debug function globally
+  window.polygptDebugStopButton = function() {
+    console.log('=== Stop Button Debug Info ===');
+    console.log('Provider:', provider);
+    console.log('Configured selectors:', config[provider]?.stopButton);
+
+    const selectors = config[provider]?.stopButton || [];
+    selectors.forEach((selector, idx) => {
+      try {
+        const elements = document.querySelectorAll(selector);
+        console.log(`Selector ${idx + 1}: "${selector}"`);
+        console.log(`  Found ${elements.length} element(s)`);
+        if (elements.length > 0) {
+          console.log('  First element:', elements[0]);
+          console.log('  HTML:', elements[0].outerHTML);
+        }
+      } catch (error) {
+        console.log(`Selector ${idx + 1}: "${selector}" - ERROR:`, error.message);
+      }
+    });
+
+    console.log('Currently streaming:', isStreaming);
+    console.log('Current stop button found:', findElement(config[provider]?.stopButton) ? 'YES' : 'NO');
+    console.log('=== End Debug Info ===');
+  };
+
+  function sendCompletion() {
+    if (hasCompletedThisCycle) return;
+
+    const viewInfo = getViewInfo ? getViewInfo() : null;
+    const position = viewInfo ? viewInfo.position : null;
+
+    // CRITICAL: Don't complete if stop button is still present (still streaming)
+    const stopButton = findElement(config[provider]?.stopButton);
+    if (stopButton && isStreaming) {
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] ⚠️ Stop button still present, not completing yet`);
+      return;
+    }
+
+    const finalResponse = extractLatestResponse(provider, config);
+
+    // Validate response exists
+    if (!finalResponse || !finalResponse.text) {
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] No valid response found`);
+      return;
+    }
+
+    const text = finalResponse.text.trim();
+
+    // Only validate that response is not empty
+    if (text.length === 0) {
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] Response is empty, skipping`);
+      return;
+    }
+
+    // Send completion
+    hasCompletedThisCycle = true;
+    isStreaming = false;
+    console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] Response complete (${text.length} chars)`);
+    ipcRenderer.send('response-complete', {
+      provider: provider,
+      position: position,
+      response: finalResponse,
+      isComplete: true
+    });
+
+    // Clear max wait timeout and retry interval
+    if (maxWaitTimeout) {
+      clearTimeout(maxWaitTimeout);
+      maxWaitTimeout = null;
+    }
+    if (retryCompletionInterval) {
+      clearInterval(retryCompletionInterval);
+      retryCompletionInterval = null;
+    }
+  }
+
+  function checkStopButton() {
+    const viewInfo = getViewInfo ? getViewInfo() : null;
+    const position = viewInfo ? viewInfo.position : null;
+
+    // Debug: Check if we have stop button selectors configured
+    if (!config[provider]?.stopButton) {
+      if (!checkStopButton.warnedNoSelector) {
+        console.warn(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] No stop button selectors configured`);
+        checkStopButton.warnedNoSelector = true;
+      }
+      return;
+    }
+
+    const stopButton = findElement(config[provider]?.stopButton, false);
+
+    if (stopButton && !isStreaming) {
+      // Stop button appeared - response started streaming
+      isStreaming = true;
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] ✓ Response started (stop button detected)`);
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] Stop button element:`, stopButton.outerHTML.substring(0, 150));
+
+      // Set max wait timeout as a safety measure
+      if (!maxWaitTimeout) {
+        maxWaitTimeout = setTimeout(() => {
+          const pos = getViewInfo ? getViewInfo()?.position : null;
+          console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${pos}] Max wait time reached, attempting completion`);
+          sendCompletion();
+
+          // If completion was blocked due to stop button, retry every 2s
+          if (!hasCompletedThisCycle) {
+            console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${pos}] Starting retry interval (stop button may still be present)`);
+            retryCompletionInterval = setInterval(() => {
+              if (!hasCompletedThisCycle) {
+                sendCompletion();
+              } else {
+                clearInterval(retryCompletionInterval);
+                retryCompletionInterval = null;
+              }
+            }, 2000);
+          }
+        }, MAX_WAIT_TIME);
+      }
+    } else if (!stopButton && isStreaming && !hasCompletedThisCycle && !checkStopButton.completionScheduled) {
+      // Stop button disappeared - response finished
+      // Use flag to prevent scheduling multiple completions
+      checkStopButton.completionScheduled = true;
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] ✓ Stop button disappeared, response complete`);
+
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        sendCompletion();
+      }, 500);
+    }
+  }
+
+  function checkAndSendResponse() {
+    if (!isMonitoring || hasCompletedThisCycle) return;
+
+    // Check stop button status
+    checkStopButton();
+
+    const response = extractLatestResponse(provider, config);
+
+    if (response && response.text && response.text !== lastResponseText) {
+      lastResponseText = response.text;
+
+      const viewInfo = getViewInfo ? getViewInfo() : null;
+      const position = viewInfo ? viewInfo.position : null;
+
+      // Only log significant updates (every 100 chars to reduce spam)
+      if (response.text.length % 100 < 50 || !isStreaming) {
+        console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] Response update: ${response.text.length} chars`);
+      }
+
+      // Send ongoing update
+      ipcRenderer.send('response-update', {
+        provider: provider,
+        position: position,
+        response: response,
+        isStreaming: isStreaming
+      });
+    }
+  }
+
+  function startMonitoring() {
+    const container = findElement(config[provider]?.responseContainer);
+
+    if (!container) {
+      console.warn(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}] Response container not found, retrying...`);
+      setTimeout(startMonitoring, 1000);
+      return;
+    }
+
+    console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}] Started response monitoring`);
+
+    // Enable monitoring
+    isMonitoring = true;
+
+    responseObserver = new MutationObserver((mutations) => {
+      checkAndSendResponse();
+    });
+
+    responseObserver.observe(container, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+
+    // Do an initial check in case response is already present
+    setTimeout(() => checkAndSendResponse(), 500);
+  }
+
+  // Reset monitoring when new question is submitted
+  ipcRenderer.on('submit-message', () => {
+    const viewInfo = getViewInfo ? getViewInfo() : null;
+    const position = viewInfo ? viewInfo.position : null;
+
+    // Reset state
+    lastResponseText = '';
+    hasCompletedThisCycle = false;
+    isStreaming = false;
+    checkStopButton.completionScheduled = false; // Reset completion flag
+
+    // Clear existing timeouts and intervals
+    if (maxWaitTimeout) clearTimeout(maxWaitTimeout);
+    maxWaitTimeout = null;
+    if (retryCompletionInterval) clearInterval(retryCompletionInterval);
+    retryCompletionInterval = null;
+
+    // Disable monitoring briefly to avoid capturing user message echo
+    isMonitoring = false;
+    console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] New question submitted, monitoring disabled for 1s`);
+
+    // DEBUG: Run DOM inspection after response should be visible
+    if (provider === 'claude' && typeof window.polygptDebugClaudeDOM === 'function') {
+      setTimeout(() => {
+        console.log('[DEBUG-TRIGGER] Running DOM inspection 10s after question submission...');
+        window.polygptDebugClaudeDOM();
+      }, 10000); // 10 seconds after submission
+    }
+
+    setTimeout(() => {
+      isMonitoring = true;
+      console.log(`[${provider.charAt(0).toUpperCase() + provider.slice(1)}@${position}] Monitoring re-enabled, waiting for response`);
+
+      // Do an initial check in case response appeared during blackout
+      checkAndSendResponse();
+    }, 1000); // 1 second delay
+  });
+
+  return { startMonitoring };
+}
+
+function waitForDOM(callback) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', callback);
+  } else {
+    callback();
+  }
+}
+
 module.exports = {
   loadConfig,
   findElement,
@@ -479,4 +886,6 @@ module.exports = {
   createLoadingOverlay,
   setupLoadingOverlay,
   waitForDOM,
+  extractLatestResponse,
+  setupResponseMonitoring,
 };
