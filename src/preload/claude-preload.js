@@ -11,6 +11,7 @@ const {
   setupLoadingOverlay,
   waitForDOM,
   setupResponseMonitoring,
+  setupHealthCheck,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -151,17 +152,36 @@ window.polygptDebugClaudeDOM = function() {
     const allElements = container.querySelectorAll('*');
     const textElements = Array.from(allElements).filter(el => {
       const text = el.innerText || el.textContent || '';
-      return text.length > 100 && !el.querySelector('*') && text.trim().length > 50;
+      // Filter out CSS/script content
+      if (text.includes('{') && text.includes('}')) {
+        const cssChars = (text.match(/[{}:;]/g) || []).length;
+        if (cssChars > text.length * 0.1) return false;
+      }
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+      return text.length > 100 && !el.querySelector('input, textarea') && text.trim().length > 50;
     });
     console.log(`Found ${textElements.length} elements with substantial text`);
-    textElements.slice(0, 5).forEach((el, idx) => {
+
+    // Sort by text length to show likely responses first
+    textElements.sort((a, b) => {
+      const aLen = (a.innerText || '').length;
+      const bLen = (b.innerText || '').length;
+      return bLen - aLen;
+    });
+
+    textElements.slice(0, 10).forEach((el, idx) => {
       const info = {
         tag: el.tagName,
         classes: el.className,
         id: el.id,
         attributes: Array.from(el.attributes).map(a => `${a.name}="${a.value}"`),
         textLength: (el.innerText || '').length,
-        textPreview: (el.innerText || '').substring(0, 150)
+        textPreview: (el.innerText || '').substring(0, 150),
+        // Add parent info to help construct selector
+        parentTag: el.parentElement?.tagName,
+        parentClasses: el.parentElement?.className,
       };
       console.log(`Text Element ${idx + 1}:`, JSON.stringify(info, null, 2));
     });
@@ -185,3 +205,6 @@ waitForDOM(() => {
   // Start monitoring after a short delay to ensure page is loaded
   setTimeout(() => responseMonitor.startMonitoring(), 2000);
 });
+
+// Setup health check (runs 10 seconds after page load)
+setupHealthCheck(provider, config, getViewInfo);

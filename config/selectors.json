@@ -3,15 +3,18 @@
     "input": [
       "#prompt-textarea",
       "textarea[placeholder*='Message']",
-      "textarea[data-testid='chat-input-textarea']",
+      "textarea[data-id='root']",
+      "div[contenteditable='true'][data-id='root']",
       "div[contenteditable='true']"
     ],
     "submit": [
       "button[data-testid='send-button']",
+      "button[data-testid='fruitjuice-send-button']",
       "button[aria-label*='Send']",
       "button[type='submit']"
     ],
     "newChat": [
+      "a[href*='/?model=']",
       "a[href='/']",
       "button[aria-label*='New chat']",
       "a[aria-label*='New chat']",
@@ -19,11 +22,11 @@
     ],
     "response": [
       "div[data-message-author-role='assistant']",
-      "article[data-testid='conversation-turn']:has([data-message-author-role='assistant'])",
-      ".agent-turn",
+      "div[data-message-author-role='assistant'] div[class*='markdown']",
+      "article div[class*='markdown']",
+      "div[class*='agent-turn']",
       "div[class*='markdown']",
-      "div.response-text",
-      "div[data-message-model-slug]"
+      "div[class*='prose']"
     ],
     "responseContainer": [
       "main",
@@ -32,8 +35,9 @@
     ],
     "stopButton": [
       "button[data-testid='stop-button']",
+      "button[data-testid='fruitjuice-stop-button']",
       "button[aria-label*='Stop']",
-      "button[aria-label*='stop generating']"
+      "button[aria-label*='stop']"
     ]
   },
   "gemini": {
@@ -46,7 +50,8 @@
     "submit": [
       "button[aria-label*='Send']",
       "button[data-testid='send-button']",
-      "div[class*='send-button'] button"
+      "div[class*='send-button'] button",
+      "button.send-button"
     ],
     "newChat": [
       "button[aria-label*='New chat']",
@@ -56,23 +61,25 @@
     ],
     "response": [
       "model-response",
-      "message-content[data-role='model']",
+      "message-content",
       "div[class*='model-response']",
-      "div[class*='response-container']",
-      "div.model-response-text",
-      "div[data-test-id*='model-turn']",
-      ".response-container-content",
-      "div[class*='conversation'] > div[class*='model']"
+      "div[class*='response']",
+      "div[data-role='model']",
+      "div[class*='message'][class*='model']",
+      "div[class*='markdown']",
+      ".markdown-content"
     ],
     "responseContainer": [
       "main",
       "chat-window",
-      "div[class*='conversation']"
+      "div[class*='conversation']",
+      "div.content-container"
     ],
     "stopButton": [
       "button[aria-label*='Stop']",
-      "button[aria-label*='stop generating']",
-      "button[class*='stop-button']"
+      "button[aria-label*='stop']",
+      "button.send-button[disabled]",
+      "button[class*='stop']"
     ]
   },
   "perplexity": {
@@ -115,30 +122,32 @@
       "div[data-testid='chat-input']",
       "div[contenteditable='true'][role='textbox']",
       "div.ProseMirror",
+      "div[contenteditable='true']",
       "[role='textbox']"
     ],
     "submit": [
+      "button[aria-label='Send Message']",
       "button[aria-label='Send message']",
       "button[aria-label*='Send']",
       "button[type='submit']"
     ],
     "newChat": [
+      "a[aria-label*='Start new chat']",
       "button[aria-label*='New']",
       "a[aria-label*='New']",
       "button[title*='New chat']"
     ],
     "response": [
       "div.font-claude-response",
-      "div.progressive-markdown",
+      "div[class*='font-claude']",
       "div.standard-markdown",
-      "p.font-claude-response-body",
-      "div[data-message-author-role='assistant']",
-      "div[data-is-streaming='true'][data-message-author-role='assistant']",
-      "div[class*='assistant'] div[class*='prose']",
-      "[data-testid*='message'][data-message-author-role='assistant']",
+      "div.progressive-markdown",
+      "div[class*='markdown']",
+      "div[class*='prose']",
+      "div.whitespace-pre-wrap",
+      "div[data-test-render-count]",
       "div[data-is-streaming]",
-      "[class*='prose']:not(:has(input))",
-      "div.whitespace-pre-wrap"
+      "div[data-message-author-role='assistant']"
     ],
     "responseContainer": [
       "main",
@@ -147,8 +156,8 @@
       "body"
     ],
     "stopButton": [
-      "button[aria-label='Stop generating']",
       "button[aria-label*='Stop']",
+      "button[aria-label='Stop generating']",
       "button[class*='stop']"
     ]
   }

@@ -476,6 +476,55 @@ app.on('ready', async () => {
       console.log(`[Merge] Ignoring response from merger window (${position})`);
     }
   });
+
+  // Health check results collection
+  const healthCheckResults = {};
+
+  ipcMain.on('health-check-result', (event, result) => {
+    healthCheckResults[result.position] = result;
+
+    console.log(`\n🏥 HEALTH CHECK RESULT: ${result.provider.toUpperCase()} @ ${result.position}`);
+    console.log(`   Health Score: ${result.healthScore}%`);
+
+    if (result.warnings.length > 0) {
+      console.log(`   ⚠️  Warnings: ${result.warnings.length}`);
+      result.warnings.forEach(w => console.log(`      - ${w}`));
+    }
+
+    if (result.recommendations.length > 0) {
+      console.log(`   💡 Recommendations: ${result.recommendations.length}`);
+      result.recommendations.forEach(r => console.log(`      - ${r}`));
+    }
+
+    // Check if we have all 4 health checks (excluding control bar)
+    const positions = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
+    const completedChecks = positions.filter(pos => healthCheckResults[pos]).length;
+
+    if (completedChecks === 4) {
+      console.log('\n========================================');
+      console.log('🏥 ALL HEALTH CHECKS COMPLETE');
+      console.log('========================================');
+
+      const allChecks = positions.map(pos => healthCheckResults[pos]);
+      const avgScore = Math.round(allChecks.reduce((sum, r) => sum + r.healthScore, 0) / 4);
+      const totalWarnings = allChecks.reduce((sum, r) => sum + r.warnings.length, 0);
+      const failingProviders = allChecks.filter(r => r.healthScore < 100);
+
+      console.log(`📊 Overall Health: ${avgScore}%`);
+      console.log(`⚠️  Total Warnings: ${totalWarnings}`);
+
+      if (failingProviders.length > 0) {
+        console.log(`\n❌ Providers with issues (${failingProviders.length}):`);
+        failingProviders.forEach(r => {
+          console.log(`   - ${r.provider} @ ${r.position}: ${r.healthScore}%`);
+        });
+      } else {
+        console.log('✅ All providers healthy!');
+      }
+
+      console.log('========================================\n');
+    }
+  });
 });
 
 app.on('window-all-closed', () => {

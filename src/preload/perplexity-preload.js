@@ -11,6 +11,7 @@ const {
   setupLoadingOverlay,
   waitForDOM,
   setupResponseMonitoring,
+  setupHealthCheck,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -152,3 +153,6 @@ waitForDOM(() => {
   // Start monitoring after a short delay to ensure page is loaded
   setTimeout(() => responseMonitor.startMonitoring(), 2000);
 });
+
+// Setup health check (runs 10 seconds after page load)
+setupHealthCheck(provider, config, getViewInfo);

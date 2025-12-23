@@ -581,10 +581,42 @@ function extractLatestResponse(provider, config) {
     // Try to find elements with substantial text content (likely responses)
     const candidates = Array.from(container.querySelectorAll('div, p, article, section')).filter(el => {
       const text = el.innerText || el.textContent || '';
-      // Must have substantial text (>50 chars) and not be an input container
-      return text.length > 50 &&
-             !el.querySelector('input, textarea') &&
-             !el.closest('[contenteditable="true"]');
+
+      // Exclude elements that are:
+      // - Too short (<50 chars)
+      // - Input containers
+      // - Inside contenteditable
+      // - Hidden (display: none or visibility: hidden)
+      // - Style/script/noscript tags
+      // - Intercom widgets
+      // - CSS content (has { } and no spaces between or very few words)
+      if (text.length < 50) return false;
+      if (el.querySelector('input, textarea')) return false;
+      if (el.closest('[contenteditable="true"]')) return false;
+      if (el.tagName === 'STYLE' || el.tagName === 'SCRIPT' || el.tagName === 'NOSCRIPT') return false;
+
+      // Exclude Intercom widget and similar UI elements
+      const className = typeof el.className === 'string' ? el.className : (el.className?.baseVal || '');
+      if (className.includes('intercom-') || className.includes('widget-') || className.includes('launcher-')) return false;
+
+      // Check if element is visible
+      const style = window.getComputedStyle(el);
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+
+      // Exclude CSS-like content (contains { } and has low word count)
+      if (text.includes('{') && text.includes('}')) {
+        const words = text.split(/\s+/).filter(w => w.length > 2);
+        const cssChars = (text.match(/[{}:;]/g) || []).length;
+        // If >20% of content is CSS characters, it's probably CSS
+        if (cssChars > text.length * 0.1 || words.length < 10) return false;
+      }
+
+      // Exclude elements with very low word density (like long strings without spaces)
+      const words = text.trim().split(/\s+/);
+      const avgWordLength = text.length / words.length;
+      if (avgWordLength > 20) return false; // Likely code/CSS, not prose
+
+      return true;
     });
 
     if (candidates.length > 0) {
@@ -599,6 +631,27 @@ function extractLatestResponse(provider, config) {
       allResponses.push(...candidates.slice(0, 10));
       workingSelector = '[auto-discovered]';
       console.log(`[${provider}] Auto-discovered ${allResponses.length} response elements`);
+
+      // Log details of top 3 candidates to help identify proper selectors
+      // Only log once per 60 seconds to avoid spam
+      const now = Date.now();
+      const shouldLog = !extractLatestResponse.lastSelectorLog || (now - extractLatestResponse.lastSelectorLog) > 60000;
+      if (candidates.length > 0 && shouldLog) {
+        extractLatestResponse.lastSelectorLog = now;
+        console.log(`[${provider}] 💡 Selector suggestions (top 3 candidates):`);
+        candidates.slice(0, 3).forEach((el, idx) => {
+          // Handle className safely (could be string or SVGAnimatedString for SVG elements)
+          const className = typeof el.className === 'string' ? el.className : (el.className?.baseVal || '');
+          const classes = className ? `.${className.split(/\s+/).filter(c => c).join('.')}` : '';
+          const id = el.id ? `#${el.id}` : '';
+          const tag = el.tagName.toLowerCase();
+          const attrs = Array.from(el.attributes)
+            .filter(a => a.name.startsWith('data-') || a.name === 'role' || a.name === 'aria-label')
+            .map(a => `[${a.name}="${a.value}"]`)
+            .join('');
+          console.log(`   ${idx + 1}. ${tag}${id}${classes.substring(0, 50)}${attrs}`);
+        });
+      }
     }
   }
 
@@ -792,6 +845,8 @@ function setupResponseMonitoring(provider, config, ipcRenderer, getViewInfo) {
       // Small delay to ensure DOM is updated
       setTimeout(() => {
         sendCompletion();
+        // Reset flag after completion
+        checkStopButton.completionScheduled = false;
       }, 500);
     }
   }
@@ -902,6 +957,135 @@ function waitForDOM(callback) {
   }
 }
 
+// Health check system - validates selectors and reports issues
+function runHealthCheck(provider, config, viewInfo) {
+  const results = {
+    provider,
+    position: viewInfo?.position || 'unknown',
+    timestamp: new Date().toISOString(),
+    checks: {},
+    warnings: [],
+    recommendations: []
+  };
+
+  console.log(`\n========== HEALTH CHECK: ${provider.toUpperCase()} ==========`);
+
+  // Check each selector type
+  const selectorTypes = ['input', 'submit', 'newChat', 'response', 'responseContainer', 'stopButton'];
+
+  selectorTypes.forEach(type => {
+    const selectors = config[provider]?.[type];
+    if (!selectors) {
+      results.checks[type] = { status: 'missing', found: false };
+      results.warnings.push(`No ${type} selectors configured`);
+      return;
+    }
+
+    const selectorsArray = Array.isArray(selectors) ? selectors : [selectors];
+    let foundElement = null;
+    let workingSelector = null;
+
+    for (const selector of selectorsArray) {
+      try {
+        const element = document.querySelector(selector);
+        if (element) {
+          foundElement = element;
+          workingSelector = selector;
+          break;
+        }
+      } catch (error) {
+        results.warnings.push(`Invalid ${type} selector: ${selector} - ${error.message}`);
+      }
+    }
+
+    if (foundElement) {
+      results.checks[type] = {
+        status: 'ok',
+        found: true,
+        selector: workingSelector,
+        tagName: foundElement.tagName,
+        visible: window.getComputedStyle(foundElement).display !== 'none'
+      };
+      console.log(`✓ ${type}: Found with selector "${workingSelector}"`);
+    } else {
+      results.checks[type] = {
+        status: 'failed',
+        found: false,
+        triedSelectors: selectorsArray
+      };
+      results.warnings.push(`❌ ${type}: No element found (tried ${selectorsArray.length} selectors)`);
+      console.warn(`❌ ${type}: No element found. Tried:`, selectorsArray);
+
+      // Try auto-discovery for responses
+      if (type === 'response') {
+        const container = findElement(config[provider]?.responseContainer) || document.body;
+        const candidates = Array.from(container.querySelectorAll('div, p, article, section')).filter(el => {
+          const text = el.innerText || el.textContent || '';
+          if (text.length < 50) return false;
+          if (el.querySelector('input, textarea')) return false;
+          if (el.tagName === 'STYLE' || el.tagName === 'SCRIPT') return false;
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden') return false;
+          return true;
+        });
+
+        if (candidates.length > 0) {
+          const topCandidate = candidates.sort((a, b) =>
+            (b.innerText || '').length - (a.innerText || '').length
+          )[0];
+
+          // Handle className safely for SVG elements
+          const className = typeof topCandidate.className === 'string'
+            ? topCandidate.className
+            : (topCandidate.className?.baseVal || '(no class)');
+
+          results.recommendations.push(
+            `Found ${candidates.length} potential response elements. Top candidate: ` +
+            `${topCandidate.tagName}.${className || '(no class)'} ` +
+            `with ${(topCandidate.innerText || '').length} chars`
+          );
+          console.log(`💡 Suggestion: Found ${candidates.length} potential response elements`);
+        }
+      }
+    }
+  });
+
+  // Overall health status
+  const failedChecks = Object.values(results.checks).filter(c => c.status === 'failed').length;
+  const totalChecks = Object.keys(results.checks).length;
+  results.healthScore = Math.round(((totalChecks - failedChecks) / totalChecks) * 100);
+
+  console.log(`\n📊 Health Score: ${results.healthScore}% (${totalChecks - failedChecks}/${totalChecks} checks passed)`);
+
+  if (results.warnings.length > 0) {
+    console.log(`\n⚠️  Warnings (${results.warnings.length}):`);
+    results.warnings.forEach(w => console.warn(`  - ${w}`));
+  }
+
+  if (results.recommendations.length > 0) {
+    console.log(`\n💡 Recommendations (${results.recommendations.length}):`);
+    results.recommendations.forEach(r => console.log(`  - ${r}`));
+  }
+
+  console.log(`========== END HEALTH CHECK ==========\n`);
+
+  // Send results to main process
+  ipcRenderer.send('health-check-result', results);
+
+  return results;
+}
+
+function setupHealthCheck(provider, config, getViewInfo, delayMs = 10000) {
+  // Run health check after page loads and content stabilizes
+  setTimeout(() => {
+    const viewInfo = getViewInfo();
+    console.log(`[${provider.toUpperCase()}] Starting health check in 10 seconds...`);
+    setTimeout(() => {
+      runHealthCheck(provider, config, viewInfo);
+    }, delayMs);
+  }, 2000);
+}
+
 module.exports = {
   loadConfig,
   findElement,
@@ -916,4 +1100,6 @@ module.exports = {
   waitForDOM,
   extractLatestResponse,
   setupResponseMonitoring,
+  setupHealthCheck,
+  runHealthCheck,
 };
