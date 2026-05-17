@@ -1,4 +1,4 @@
-const { app, ipcMain } = require('electron');
+const { app, ipcMain, clipboard } = require('electron');
 const windowManager = require('./window-manager');
 const path = require('path');
 const fs = require('fs');
@@ -139,17 +139,66 @@ Please provide a merged, comprehensive answer with proper citations following th
   const mergerProviderKey = mergerView ? mergerView.providerKey : 'unknown';
   console.log(`[Merge] Sending merge prompt to merger window: ${mergeState.mergerWindow} (${mergerProviderKey})`);
 
+  // DIAGNOSTIC: log the exact prompt being sent so we can compare across mergers
+  {
+    let h = 5381;
+    for (let i = 0; i < mergePrompt.length; i++) {
+      h = ((h << 5) + h + mergePrompt.charCodeAt(i)) | 0;
+    }
+    const hash = (h >>> 0).toString(16);
+    const head = JSON.stringify(mergePrompt.slice(0, 100));
+    const tail = JSON.stringify(mergePrompt.slice(-100));
+    console.log(`[Merge-DIAG] To ${mergerProviderKey}@${mergeState.mergerWindow}: len=${mergePrompt.length} hash=${hash} head=${head} tail=${tail}`);
+    const providerList = responsesToMerge.map(r => `${r.provider}@${r.position}[${r.citationNum}]=${r.text.length}ch`).join(', ');
+    console.log(`[Merge-DIAG] Sources merged: ${providerList}`);
+  }
+
   // Mark merge in progress BEFORE sending the prompt
   mergeState.mergeInProgress = true;
 
-  // Send the merge prompt to the merger window
+  // Send the merge prompt to the merger window via clipboard paste.
+  // Why: each provider's execCommand-based injectText handles large prompts
+  // differently (Gemini truncates to <10% of original). Native paste routes
+  // through Chromium's clipboard pathway and lands the full text identically
+  // in ProseMirror, contenteditable, and Angular rich-textarea.
   if (mergerView && mergerView.webContents) {
-    mergerView.webContents.send('text-update', mergePrompt);
+    const savedClipboard = clipboard.readText();
+    clipboard.writeText(mergePrompt);
+    console.log(`[Merge-DIAG] Clipboard set with merge prompt (${mergePrompt.length} chars), saved previous clipboard (${savedClipboard.length} chars)`);
 
-    // Auto-submit after a brief delay to allow text to be injected
+    // Ask the preload to focus the input element first
+    mergerView.webContents.send('focus-merge-input');
+
+    // After focus settles, select-all (to clear any existing input) then paste
     setTimeout(() => {
-      mergerView.webContents.send('submit-message');
-    }, 500);
+      try {
+        mergerView.webContents.selectAll();
+        mergerView.webContents.paste();
+        console.log('[Merge-DIAG] Paste dispatched via webContents.paste()');
+      } catch (e) {
+        console.error('[Merge-DIAG] paste failed:', e);
+      }
+
+      // Ask the preload to log what actually landed in the input
+      setTimeout(() => {
+        mergerView.webContents.send('verify-merge-paste', mergePrompt.length);
+      }, 500);
+
+      // Submit after the editor has committed the pasted content
+      setTimeout(() => {
+        mergerView.webContents.send('submit-message');
+      }, 800);
+
+      // Restore clipboard after the submission has had time to read it
+      setTimeout(() => {
+        try {
+          clipboard.writeText(savedClipboard);
+          console.log('[Merge-DIAG] Restored previous clipboard');
+        } catch (e) {
+          console.error('[Merge-DIAG] clipboard restore failed:', e);
+        }
+      }, 2500);
+    }, 250);
   }
 
   // Reset collection state for next question (but keep mergeInProgress = true)

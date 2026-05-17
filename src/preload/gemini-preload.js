@@ -12,6 +12,8 @@ const {
   waitForDOM,
   setupResponseMonitoring,
   setupHealthCheck,
+  describePayload,
+  simpleHash,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -38,6 +40,9 @@ function findGeminiInput(element) {
 }
 
 function injectText(text) {
+  if (text && text.length > 1000) {
+    console.log(`[gemini-INJECT-DIAG] received: ${describePayload(text)}`);
+  }
   const rawElement = findElement(config.gemini?.input);
   inputElement = findGeminiInput(rawElement);
 
@@ -47,6 +52,17 @@ function injectText(text) {
   }
 
   lastText = text;
+
+  if (text && text.length > 1000) {
+    setTimeout(() => {
+      try {
+        const actual = inputElement.innerText || inputElement.textContent || '';
+        console.log(`[gemini-INJECT-DIAG] in-DOM after 400ms: ${describePayload(actual)}`);
+      } catch (e) {
+        console.log('[gemini-INJECT-DIAG] verification failed:', e.message);
+      }
+    }, 400);
+  }
 
   // Focus the element first - required for execCommand to work
   inputElement.focus();
@@ -104,6 +120,31 @@ const submitMessage = createSubmitHandler(
 );
 
 setupIPCListeners(provider, config, injectText, submitMessage, { value: lastText });
+
+// Merge-mode paste path: main writes the merge prompt to the system clipboard
+// then asks us to focus the input element. After focus settles, main calls
+// webContents.selectAll() + .paste() to deliver the full prompt natively.
+ipcRenderer.on('focus-merge-input', () => {
+  const rawElement = findElement(config.gemini?.input);
+  const target = findGeminiInput(rawElement);
+  if (target) {
+    target.focus();
+    console.log('[gemini-INJECT-DIAG] focus-merge-input: focused', target.tagName, target.contentEditable);
+  } else {
+    console.warn('[gemini-INJECT-DIAG] focus-merge-input: input element not found');
+  }
+});
+
+ipcRenderer.on('verify-merge-paste', (event, expectedLen) => {
+  const rawElement = findElement(config.gemini?.input);
+  const target = findGeminiInput(rawElement);
+  if (!target) {
+    console.warn('[gemini-INJECT-DIAG] verify-merge-paste: input element not found');
+    return;
+  }
+  const actual = target.innerText || target.textContent || '';
+  console.log(`[gemini-INJECT-DIAG] verify-merge-paste (expected ${expectedLen} chars): ${describePayload(actual)}`);
+});
 
 setupInputScanner(
   provider,

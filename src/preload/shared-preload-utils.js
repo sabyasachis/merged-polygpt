@@ -3,6 +3,22 @@ const path = require('path');
 const fs = require('fs');
 const throttle = require('../utils/throttle');
 
+function simpleHash(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) {
+    h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(16);
+}
+
+function describePayload(text) {
+  if (text == null) return 'null';
+  const len = text.length;
+  const head = JSON.stringify(text.slice(0, 100));
+  const tail = JSON.stringify(text.slice(-100));
+  return `len=${len} hash=${simpleHash(text)} head=${head} tail=${tail}`;
+}
+
 function loadConfig() {
   try {
     const configPath = path.join(__dirname, '../../config/selectors.json');
@@ -1364,6 +1380,8 @@ function setupHealthCheck(provider, config, getViewInfo, delayMs = 10000) {
 }
 
 module.exports = {
+  simpleHash,
+  describePayload,
   loadConfig,
   findElement,
   createSubmitHandler,

@@ -12,6 +12,7 @@ const {
   waitForDOM,
   setupResponseMonitoring,
   setupHealthCheck,
+  describePayload,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -20,6 +21,9 @@ const provider = 'claude';
 let inputElement = null;
 let lastText = '';
 function injectText(text) {
+  if (text && text.length > 1000) {
+    console.log(`[claude-INJECT-DIAG] received: ${describePayload(text)}`);
+  }
   // Always rescan input element in case user switched chats
   inputElement = findElement(config.claude?.input);
 
@@ -29,6 +33,17 @@ function injectText(text) {
   }
 
   lastText = text;
+
+  if (text && text.length > 1000) {
+    setTimeout(() => {
+      try {
+        const actual = inputElement.innerText || inputElement.textContent || '';
+        console.log(`[claude-INJECT-DIAG] in-DOM after 400ms: ${describePayload(actual)}`);
+      } catch (e) {
+        console.log('[claude-INJECT-DIAG] verification failed:', e.message);
+      }
+    }, 400);
+  }
 
   // Focus the element first - required for execCommand to work
   inputElement.focus();
@@ -124,6 +139,26 @@ function claudeSubmitMessage() {
 }
 
 setupIPCListeners(provider, config, injectText, claudeSubmitMessage, { value: lastText });
+
+ipcRenderer.on('focus-merge-input', () => {
+  const target = findElement(config.claude?.input);
+  if (target) {
+    target.focus();
+    console.log('[claude-INJECT-DIAG] focus-merge-input: focused', target.tagName, target.contentEditable);
+  } else {
+    console.warn('[claude-INJECT-DIAG] focus-merge-input: input element not found');
+  }
+});
+
+ipcRenderer.on('verify-merge-paste', (event, expectedLen) => {
+  const target = findElement(config.claude?.input);
+  if (!target) {
+    console.warn('[claude-INJECT-DIAG] verify-merge-paste: input element not found');
+    return;
+  }
+  const actual = target.innerText || target.textContent || '';
+  console.log(`[claude-INJECT-DIAG] verify-merge-paste (expected ${expectedLen} chars): ${describePayload(actual)}`);
+});
 
 setupInputScanner(
   provider,

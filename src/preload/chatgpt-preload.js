@@ -12,6 +12,7 @@ const {
   waitForDOM,
   setupResponseMonitoring,
   setupHealthCheck,
+  describePayload,
 } = require('./shared-preload-utils');
 
 const config = loadConfig();
@@ -21,6 +22,9 @@ let inputElement = null;
 let lastText = '';
 
 function injectText(text) {
+  if (text && text.length > 1000) {
+    console.log(`[chatgpt-INJECT-DIAG] received: ${describePayload(text)}`);
+  }
   inputElement = findElement(config.chatgpt?.input);
 
   if (!inputElement) {
@@ -29,6 +33,19 @@ function injectText(text) {
   }
 
   lastText = text;
+
+  if (text && text.length > 1000) {
+    setTimeout(() => {
+      try {
+        const actual = inputElement.value != null
+          ? inputElement.value
+          : (inputElement.innerText || inputElement.textContent || '');
+        console.log(`[chatgpt-INJECT-DIAG] in-DOM after 400ms: ${describePayload(actual)}`);
+      } catch (e) {
+        console.log('[chatgpt-INJECT-DIAG] verification failed:', e.message);
+      }
+    }, 400);
+  }
 
   // Focus the element first
   inputElement.focus();
@@ -78,6 +95,28 @@ const submitMessage = createSubmitHandler(
 );
 
 setupIPCListeners(provider, config, injectText, submitMessage, { value: lastText });
+
+ipcRenderer.on('focus-merge-input', () => {
+  const target = findElement(config.chatgpt?.input);
+  if (target) {
+    target.focus();
+    console.log('[chatgpt-INJECT-DIAG] focus-merge-input: focused', target.tagName, target.contentEditable);
+  } else {
+    console.warn('[chatgpt-INJECT-DIAG] focus-merge-input: input element not found');
+  }
+});
+
+ipcRenderer.on('verify-merge-paste', (event, expectedLen) => {
+  const target = findElement(config.chatgpt?.input);
+  if (!target) {
+    console.warn('[chatgpt-INJECT-DIAG] verify-merge-paste: input element not found');
+    return;
+  }
+  const actual = target.value != null
+    ? target.value
+    : (target.innerText || target.textContent || '');
+  console.log(`[chatgpt-INJECT-DIAG] verify-merge-paste (expected ${expectedLen} chars): ${describePayload(actual)}`);
+});
 
 setupInputScanner(
   provider,
